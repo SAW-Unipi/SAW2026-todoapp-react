@@ -1,7 +1,63 @@
+import { useRef, useState } from 'react'
+import type { List } from './types'
+import { BrowserRouter, Route, Routes, useNavigate, useParams } from 'react-router';
 
 function App() {
+  return (
+    <>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<ListsPage />} />
+          <Route path="lists/:id" element={<ListPage />} />
+        </Routes>
+      </BrowserRouter>
+    </>
+  )
+}
 
-  const lists: List[] = [
+export default App
+
+function EditableText({ editing, value, onChange, onCancel = () => {} }: {
+  editing: boolean;
+  value: string;
+  onChange: (text: string) => void;
+  onCancel?: () => void
+}) {
+  const input = useRef<HTMLInputElement>(null);
+
+  function onKeyUp(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      const text = input.current!.value.trim();
+      if (text === '') { return; }
+      onChange(text)
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      input.current!.value = '';
+      onCancel()
+      return;
+    }
+  }
+
+  return <>{
+    editing
+      ? <input ref={input} type="text" defaultValue={value} onKeyUp={onKeyUp} />
+      : <span className="title">{value}</span>
+  }
+  </>;
+}
+
+function ListPage() {
+  const { id } = useParams();
+
+  return <>
+    <p>Hello! {id}</p>
+  </>;
+}
+
+function ListsPage() {
+  const [lists, setLists] = useState<List[]>([
     {
       id: '1',
       title: 'HTML',
@@ -12,49 +68,81 @@ function App() {
       title: 'CSS',
       tasks: [],
     },
-     {
+    {
       id: '3',
       title: 'JavaScript',
       tasks: [],
     },
-  ]
+  ]);
 
-  return (
-    <>
-      <h1>SAW TODO</h1>
-      <div className="container">
-        <input type="text"
-          className="text-input"
-          placeholder="Inserisci lista..." />
-        {lists.map((list) => <List list={list} key={list.id}/>)}
-      </div>
-    </>
-  )
+
+  function addList(title: string) {
+    const l: List = {
+      id: crypto.randomUUID(),
+      title,
+      tasks: [],
+    }
+    setLists(v => [...v, l]);
+  }
+
+  function deleteList(id: string) {
+    setLists(v => v.filter(l => l.id !== id));
+  }
+
+  function updateList(updatedList: Partial<List>, listId: string) {
+    setLists(ls => ls.map(l => l.id === listId ? { ...l, ...updatedList } : l));
+  }
+
+  const input = useRef<HTMLInputElement>(null);
+
+  function onKeyUp(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      const title = input.current!.value.trim();
+      if (title === '') { return; }
+      addList(title);
+      input.current!.value = '';
+      return;
+    }
+    if (e.key === 'Escape') {
+      input.current!.value = '';
+      return;
+    }
+  }
+  return <>
+    <h1>SAW TODO</h1>
+    <div className="container">
+      <EditableText editing={true}
+      value="Le mie liste"
+      onChange={(title) => { addList(title); }}
+      />
+    <input type="text"
+      ref={input}
+      onKeyUp={onKeyUp}
+      className="text-input"
+      placeholder="Inserisci lista..." />
+    {lists.map((list) => <List list={list} key={list.id} deleteList={deleteList} updateList={updateList} />)}
+  </div >
+  </>;
 }
 
-export default App
+function List({ list, deleteList, updateList }: { list: List; deleteList: (id: string) => void; updateList: (newList: Partial<List>, listId: string) => void }) {
 
-interface Task {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-interface List {
-  id: string;
-  title: string;
-  tasks: Task[];
-}
-
-function List({ list }: { list: List }) {
+  const [isEditing, setIsEditing] = useState(false);
 
   return <div className="list">
     <div className="list-title">
-      <span className="title">{list.title}</span>
+      <EditableText editing={isEditing}
+        value={list.title}
+        onChange={(text) => {
+          updateList({ title: text }, list.id);
+          setIsEditing(false);
+        }}
+        onCancel={() => setIsEditing(false)}
+      />
       <div>
-        <EditButton />
-        <OpenListButton />
-        <DeleteListButton />
+        {!isEditing && <EditButton onClick={() => setIsEditing(true)} />}
+        <OpenListButton id={list.id} />
+        <DeleteListButton onClick={() => deleteList(list.id)} />
       </div>
     </div>
     <CompleteListBar />
@@ -70,8 +158,8 @@ function CompleteListBar() {
   </div>
 }
 
-function DeleteListButton() {
-  return <button className="btn">
+function DeleteListButton({ onClick }: { onClick: () => void }) {
+  return <button className="btn" onClick={() => onClick()}>
     {/*<!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->*/}
     <svg xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 512 512">
@@ -81,8 +169,10 @@ function DeleteListButton() {
   </button>
 }
 
-function OpenListButton() {
-  return <button className="btn">
+function OpenListButton({ id }: { id: string }) {
+  const navigate = useNavigate();
+
+  return <button className="btn" onClick={() => navigate(`/lists/${id}`)}>
     {/*<!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->*/}
     <svg xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 512 512">
@@ -92,8 +182,8 @@ function OpenListButton() {
   </button>
 }
 
-function EditButton() {
-  return <button className="btn">
+function EditButton({ onClick }: { onClick: () => void }) {
+  return <button className="btn" onClick={() => onClick()}>
     {/*<!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->*/}
     <svg xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 512 512">
