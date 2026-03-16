@@ -1,27 +1,102 @@
 import { useRef, useState } from 'react'
-import type { List } from './types'
+import type { List, Task } from './types'
 import { BrowserRouter, Route, Routes, useNavigate, useParams } from 'react-router';
+import { db, ListContext, useLists, useTasks } from './hooks';
 
 function App() {
+
+  const [lists, setLists] = useState<List[]>(db);
+
   return (
     <>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<ListsPage />} />
-          <Route path="lists/:id" element={<ListPage />} />
-        </Routes>
-      </BrowserRouter>
+      <ListContext value={{ lists, setLists }}>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<ListsPage />} />
+            <Route path="lists/:id" element={<TodoPage />} />
+          </Routes>
+        </BrowserRouter>
+      </ListContext>
     </>
   )
 }
 
 export default App
 
-function EditableText({ editing, value, onChange, onCancel = () => {} }: {
+function TodoPage() {
+
+  const { id } = useParams();
+  const { tasks, addTask } = useTasks(id!);
+  const navigate = useNavigate();
+
+  return <>
+    <header>
+      <h1>SAW TODO</h1>
+      <h2>HTML</h2>
+      <button className="btn" onClick={() => navigate('/')}>
+        <BackButton />
+      </button>
+    </header>
+    <div className="container">
+      <EditableText editing={true}
+        className='text-input'
+        value="I miei task"
+        onChange={(title) => addTask(title)}
+      />
+
+      <section className="todos">
+        <ul>
+          {tasks.map(t => <li><TaskItem task={t} /></li>)}
+        </ul>
+      </section>
+
+    </div>
+  </>;
+}
+
+function TaskItem({ task }: { task: Task }) {
+  const { id } = useParams();
+  const { updateTask, deleteTask } = useTasks(id!);
+  const [isEditing, setIsEditing] = useState(false);
+
+  return <>
+    <div className="item">
+      <div onDoubleClick={() => setIsEditing(true)}>
+        <input type="checkbox"
+          onClick={() => updateTask({ completed: !task.completed }, task.id)}
+          checked={task.completed} />
+
+        <EditableText editing={isEditing}
+          textClass={task.completed ? "completed" : ""}
+          value={task.title}
+          onCancel={() => { }}
+          onChange={(title) => {
+            updateTask({ title }, task.id);
+            setIsEditing(false);
+          }}
+        />
+        <button onClick={() => deleteTask(task.id)}>&times;</button>
+      </div>
+
+    </div >
+  </>;
+}
+
+function BackButton() {
+  return <svg xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 512 512">
+    <path
+      d="M512 256A256 256 0 1 0 0 256a256 256 0 1 0 512 0zM217.4 376.9L117.5 269.8c-3.5-3.8-5.5-8.7-5.5-13.8s2-10.1 5.5-13.8l99.9-107.1c4.2-4.5 10.1-7.1 16.3-7.1c12.3 0 22.3 10 22.3 22.3l0 57.7 96 0c17.7 0 32 14.3 32 32l0 32c0 17.7-14.3 32-32 32l-96 0 0 57.7c0 12.3-10 22.3-22.3 22.3c-6.2 0-12.1-2.6-16.3-7.1z" />
+  </svg>;
+}
+
+function EditableText({ editing, value, onChange, onCancel = () => { }, className = "", textClass = "title" }: {
   editing: boolean;
   value: string;
   onChange: (text: string) => void;
-  onCancel?: () => void
+  onCancel?: () => void;
+  className?: string;
+  textClass?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
 
@@ -42,97 +117,41 @@ function EditableText({ editing, value, onChange, onCancel = () => {} }: {
 
   return <>{
     editing
-      ? <input ref={input} type="text" defaultValue={value} onKeyUp={onKeyUp} />
-      : <span className="title">{value}</span>
+      ? <input className={`${className}`} ref={input} type="text" defaultValue={value} onKeyUp={onKeyUp} />
+      : <span className={textClass}>{value}</span>
   }
   </>;
 }
 
-function ListPage() {
-  const { id } = useParams();
-
-  return <>
-    <p>Hello! {id}</p>
-  </>;
-}
 
 function ListsPage() {
-  const [lists, setLists] = useState<List[]>([
-    {
-      id: '1',
-      title: 'HTML',
-      tasks: [],
-    },
-    {
-      id: '2',
-      title: 'CSS',
-      tasks: [],
-    },
-    {
-      id: '3',
-      title: 'JavaScript',
-      tasks: [],
-    },
-  ]);
+  const { lists, addList, updateList, deleteList } = useLists();
 
-
-  function addList(title: string) {
-    const l: List = {
-      id: crypto.randomUUID(),
-      title,
-      tasks: [],
-    }
-    setLists(v => [...v, l]);
-  }
-
-  function deleteList(id: string) {
-    setLists(v => v.filter(l => l.id !== id));
-  }
-
-  function updateList(updatedList: Partial<List>, listId: string) {
-    setLists(ls => ls.map(l => l.id === listId ? { ...l, ...updatedList } : l));
-  }
-
-  const input = useRef<HTMLInputElement>(null);
-
-  function onKeyUp(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      const title = input.current!.value.trim();
-      if (title === '') { return; }
-      addList(title);
-      input.current!.value = '';
-      return;
-    }
-    if (e.key === 'Escape') {
-      input.current!.value = '';
-      return;
-    }
-  }
   return <>
     <h1>SAW TODO</h1>
     <div className="container">
       <EditableText editing={true}
-      value="Le mie liste"
-      onChange={(title) => { addList(title); }}
+        className='text-input'
+        value="Le mie liste"
+        onChange={(title) => { addList(title); }}
       />
-    <input type="text"
-      ref={input}
-      onKeyUp={onKeyUp}
-      className="text-input"
-      placeholder="Inserisci lista..." />
-    {lists.map((list) => <List list={list} key={list.id} deleteList={deleteList} updateList={updateList} />)}
-  </div >
+      {lists.map((list) => <List list={list} key={list.id} deleteList={deleteList} updateList={updateList} />)}
+    </div >
   </>;
 }
 
 function List({ list, deleteList, updateList }: { list: List; deleteList: (id: string) => void; updateList: (newList: Partial<List>, listId: string) => void }) {
 
   const [isEditing, setIsEditing] = useState(false);
+  const percentage = list.tasks.length === 0
+    ? 0
+    : Math.round(list.tasks.filter(t => t.completed).length / list.tasks.length * 100);
 
   return <div className="list">
     <div className="list-title">
       <EditableText editing={isEditing}
         value={list.title}
+        className=''
         onChange={(text) => {
           updateList({ title: text }, list.id);
           setIsEditing(false);
@@ -145,15 +164,15 @@ function List({ list, deleteList, updateList }: { list: List; deleteList: (id: s
         <DeleteListButton onClick={() => deleteList(list.id)} />
       </div>
     </div>
-    <CompleteListBar />
+    <CompleteListBar percentage={percentage} />
   </div>
 }
 
-function CompleteListBar() {
+function CompleteListBar({ percentage = 30 }: { percentage?: number }) {
   return <div className="bar">
-    <span className="percentage"
-      data-value="90%">
-      <span className="tooltip">90%</span>
+    <span className="percentage" style={{ width: `${percentage}%` }}
+      data-value="10%">
+      <span className="tooltip">{percentage}%</span>
     </span>
   </div>
 }

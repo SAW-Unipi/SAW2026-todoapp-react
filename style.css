@@ -80,7 +80,7 @@ header>h2 {
   position: relative;
   display: block;
   height: 100%;
-  width: 90%;
+  width: 50%;
   background-color: #4070f4;
   border-radius: 6px;
   animation: progress 0.4s ease-in-out forwards;
